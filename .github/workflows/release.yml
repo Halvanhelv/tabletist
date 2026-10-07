@@ -1,7 +1,9 @@
 name: Release
 
-# A v* tag builds every package, publishes a GitHub release with checksums,
-# and updates the AUR. Run it by hand (workflow_dispatch) for a dry run that
+# A v* tag builds every package, publishes a GitHub release with signed
+# checksums, and updates the AUR. Installed copies read the repository's
+# latest release and update themselves from it, so what is published here
+# reaches people's machines. Run it by hand (workflow_dispatch) for a dry run that
 # builds and uploads the artifacts but publishes nothing.
 on:
   push:
@@ -85,6 +87,9 @@ jobs:
           name="tabletist-${TAG}-${{ matrix.target }}"
           mkdir -p "dist/$name"
           cp README.md LICENSE "dist/$name/"
+          # A copy unpacked from this archive updates itself only beside
+          # this file (src/updates.rs).
+          printf '%s' 'tabletist-portable-v1' > "dist/$name/tabletist-portable.txt"
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "target/${{ matrix.target }}/release/tabletist.exe" "dist/$name/"
             (cd dist && 7z a "$name.zip" "$name" >/dev/null)
@@ -229,15 +234,33 @@ jobs:
             security delete-keychain "$RUNNER_TEMP/signing.keychain-db"
           fi
 
+  # The only job that sees the update-signing key, and the only one that
+  # writes: it creates the release. It builds nothing: cargo runs the build
+  # scripts and proc macros of every dependency, and none of them should run
+  # beside the key.
+  #
+  # The key lives in the release-signing environment, which should take jobs
+  # from v* tags only: no other run, branch or pull request can then read it.
   publish:
     name: GitHub release
     needs: [build, macos]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    # The only job that writes: it creates the release.
+    environment: release-signing
     permissions:
       contents: write
+    env:
+      # Only whether the key is set; the key itself is in the one step that
+      # uses it.
+      HAS_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY != '' }}
     steps:
+      # The public key the signature is checked against.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: assets/update-public-key.hex
+          sparse-checkout-cone-mode: false
+          path: source
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -245,12 +268,34 @@ jobs:
           pattern: "!macos-universal-binary"
           merge-multiple: true
       # The source archive, so source packages check the same checksums.
-      - name: Source archive and checksums
+      - name: Source archive
         run: |
           curl --fail --location --retry 3 \
             "https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz" \
             --output "dist/tabletist-${TAG}-source.tar.gz"
-          (cd dist && sha256sum * > checksums.txt && cat checksums.txt)
+      - uses: ruby/setup-ruby@v1
+        if: env.HAS_UPDATE_SIGNING_KEY == 'true'
+        with:
+          ruby-version: '3.4'
+      # Writes checksums.txt and checksums.txt.sig, a raw Ed25519 signature
+      # over its exact bytes, after checking that the secret matches the key
+      # compiled into the app. An installed copy installs nothing without a
+      # valid signature. See packaging/UPDATE_SIGNING.md.
+      - name: Sign update manifest
+        if: env.HAS_UPDATE_SIGNING_KEY == 'true'
+        uses: crmne/native-packages/.github/actions/sign-release@999768410cf53cdc68c8679c09cb14de1a6bca7b # v0.8.1
+        with:
+          directory: dist
+          public-key: source/assets/update-public-key.hex
+          key-env: UPDATE_SIGNING_KEY
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+      - name: Checksums without a signature
+        if: env.HAS_UPDATE_SIGNING_KEY != 'true'
+        run: |
+          echo "::warning::UPDATE_SIGNING_KEY is not set: this release is not signed, and no installed copy will update itself to it."
+          (cd dist && sha256sum * > checksums.txt)
+      - run: cat dist/checksums.txt
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
