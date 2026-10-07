@@ -139,14 +139,27 @@ other way round.
 2. On that commit: `git tag -s v0.2.0 -m v0.2.0 && git push origin v0.2.0`.
 3. `release.yml` builds Linux (x86_64, aarch64 `.tar.gz`), Windows (x64,
    arm64 `.zip` and `-setup.exe`) and macOS (universal `.dmg`), publishes a
-   GitHub release with `checksums.txt`, then updates the AUR. A tag with a
-   `-` (`v0.2.0-rc1`) is a pre-release and skips the AUR.
+   GitHub release with `checksums.txt` and its signature, then updates the
+   AUR. A tag with a `-` (`v0.2.0-rc1`) is a pre-release and skips the AUR.
+
+Installed copies update themselves from the latest release
+(`src/updates.rs`, through fastframe-update), so a published release reaches
+people's machines. They take the package named for their platform
+(`tabletist-v<version>-<target>` with `.dmg`, `-setup.exe`, `.zip` or
+`.tar.gz`), so those names, the `tabletist-portable.txt` and
+`tabletist-installer.txt` markers and `tabletist --version` printing
+`tabletist <version>` do not change without a transition. See
+`packaging/UPDATE_SIGNING.md` for the signature and for trying an update
+without publishing one.
 
 Optional secrets (each step skips with a notice without them):
 
 - `APPLE_CERTIFICATE_P12` (base64), `APPLE_CERTIFICATE_PASSWORD`,
   `APPLE_SIGNING_IDENTITY`: sign the app and DMG with a Developer ID.
 - `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_PASSWORD`: notarize and staple.
+- `UPDATE_SIGNING_KEY`, in the `release-signing` environment: sign
+  `checksums.txt`. Without it the release is published unsigned, and no
+  installed copy updates itself to it.
 - `AUR_SSH_KEY`: push `tabletist-bin` and `tabletist` to the AUR. The AUR's
   host key is pinned in `release.yml`; update it there if the AUR rotates it.
 

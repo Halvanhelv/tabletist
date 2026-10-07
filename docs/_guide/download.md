@@ -53,6 +53,31 @@ The Linux binaries are built on Ubuntu 24.04 and need glibc 2.39 or newer
 (Ubuntu 24.04, Debian 13, Fedora 40 or later). On an older system,
 [build from source]({% link _reference/build-from-source.md %}).
 
+## Updates
+
+Tabletist looks for a newer release when it starts and every six hours after
+that. It downloads nothing by itself. When there is a newer release, the
+About window says so:
+
+1. Open **About Tabletist** (from the keyboard shortcuts window, or the app
+   menu on macOS).
+2. Click **Download update**. The download is checked against the
+   publisher's signature before anything is installed.
+3. Click **Restart to update**. Tabletist closes, the new version is
+   installed and it opens again. If the new version does not start, the
+   previous one comes back.
+
+Save or discard pending changes first: Tabletist does not restart over them.
+**Check for updates** in the same window looks at once.
+
+A copy updates itself only where it can replace itself: the app in
+**Applications** on macOS, a copy installed by the Windows installer, and a
+copy unpacked from the `.zip` or `.tar.gz` with the `tabletist-portable.txt`
+file still beside it. A copy that a package manager installed (the AUR,
+Homebrew) is updated by that package manager, and the About window says
+which version is out. Versions 0.2.0 and earlier do not update themselves:
+install the next one by hand.
+
 ## Next
 
 [Open Tabletist and make your first connection]({% link _guide/getting-started.md %}).
