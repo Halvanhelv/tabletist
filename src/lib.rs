@@ -23,4 +23,5 @@ pub mod testing;
 pub mod theme;
 pub mod typography;
 pub mod ui;
+pub mod updates;
 pub mod util;

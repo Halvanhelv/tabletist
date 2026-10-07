@@ -79,7 +79,11 @@ fn report_startup_error(error: &anyhow::Error) {
 }
 
 pub fn main() -> anyhow::Result<()> {
-    let cli = Cli::parse();
+    // First: an update's helper is this program, started with a flag of
+    // its own. It installs and exits here; any other start goes on, with
+    // what the helper said about the last update.
+    let launch = fastframe_update::intercept(&crate::updates::CONFIG);
+    let cli = Cli::parse_from(&launch.arguments);
     // Demo runs use a throwaway profile: nothing touches the user's files.
     // It lives until the window closes and is removed when `main` returns.
     let demo_root = if cli.demo {
@@ -111,6 +115,7 @@ pub fn main() -> anyhow::Result<()> {
     let settings = Settings::load(&dirs);
     let demo = cli.demo;
     let shot = cli.demo_shot.clone().map(Shot::new);
+    let (receipt, update_error) = (launch.receipt, launch.error);
     eframe::run_native(
         "Tabletist",
         native_options(cli.demo_size, !demo),
@@ -124,6 +129,14 @@ pub fn main() -> anyhow::Result<()> {
             app.attach(&cc.egui_ctx, !demo);
             if demo {
                 demo_setup(&mut app);
+            } else {
+                let repaint = cc.egui_ctx.clone();
+                app.updates = crate::updates::Updates::spawn(move || repaint.request_repaint());
+            }
+            // The update that was not installed: the previous version is back.
+            if let Some(error) = update_error {
+                log::warn!("updates: {error}");
+                app.notice = Some(error);
             }
             // The menu bar is up by now: winit builds it before the window.
             #[cfg(target_os = "macos")]
@@ -148,6 +161,7 @@ pub fn main() -> anyhow::Result<()> {
                 app,
                 shot,
                 demo,
+                receipt,
                 #[cfg(target_os = "macos")]
                 title_bar: None,
                 #[cfg(target_os = "macos")]
@@ -278,6 +292,10 @@ struct Window {
     app: App,
     shot: Option<Shot>,
     demo: bool,
+    /// Set when an update's helper started this version, until the first
+    /// frame is drawn: the helper puts the previous one back unless told
+    /// that this one came up.
+    receipt: Option<fastframe_update::Receipt>,
     /// macOS: the window whose unified title bar the tabs share, once it
     /// exists.
     #[cfg(target_os = "macos")]
@@ -376,6 +394,15 @@ impl eframe::App for Window {
             }
         }
         self.app.frame_ui(ui);
+        // A frame was drawn: this version works. Off the UI thread, since
+        // it writes a file.
+        if let Some(receipt) = self.receipt.take() {
+            std::thread::spawn(move || {
+                if let Err(error) = receipt.acknowledge() {
+                    log::warn!("updates: could not confirm the update: {error:#}");
+                }
+            });
+        }
         #[cfg(target_os = "macos")]
         if let Some(title_bar) = &self.title_bar {
             let zoom = ui.ctx().zoom_factor();

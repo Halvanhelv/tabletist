@@ -107,6 +107,7 @@ fn doing(held: &Held, terminal: bool) -> &'static str {
             Action::CloseConnTab(_) | Action::Disconnect(_) | Action::Connect { .. } => {
                 "disconnecting"
             }
+            Action::RestartToUpdate => "restarting to update",
             _ => "going on",
         },
         Held::CloseWindow => "closing the window",

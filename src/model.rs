@@ -492,6 +492,12 @@ pub enum Action {
     ShowAbout,
     /// Show the Settings window.
     ShowSettings,
+    /// Look for a newer release now.
+    CheckForUpdates,
+    /// Download the newer release that was found.
+    DownloadUpdate,
+    /// Quit, so the downloaded release is installed and started.
+    RestartToUpdate,
     /// Move the Settings window's cursor by this many options.
     MoveSettingsRow(isize),
     /// Put the Settings window's cursor on this option.

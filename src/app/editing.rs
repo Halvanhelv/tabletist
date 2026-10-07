@@ -169,6 +169,8 @@ impl App {
             // key to save by.
             | Action::RetryStructure { tab, object_tab } => one(*tab, *object_tab),
             Action::CloseTab { tab, id } => one(*tab, *id),
+            // The app quits to be replaced: every tab's set would go.
+            Action::RestartToUpdate => self.holding_edits(),
             // The active tab's page, as the arm fetches it. Nothing while
             // a SQL editor shows: the arm does nothing there.
             Action::Refresh(tab) => self

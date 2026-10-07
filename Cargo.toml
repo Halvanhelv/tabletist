@@ -68,6 +68,12 @@ fastframe-theme = { git = "https://github.com/crmne/fastframe", tag = "v0.4.1" }
 fastframe-i18n = { git = "https://github.com/crmne/fastframe", tag = "v0.4.1" }
 # Log file for bug reports and a panic log without payloads.
 fastframe-log = { git = "https://github.com/crmne/fastframe", tag = "v0.4.1" }
+# Self-update from the GitHub releases: the check, the signed download, and
+# the helper that installs it and rolls back (src/updates.rs).
+fastframe-update = { git = "https://github.com/crmne/fastframe", tag = "v0.4.1", features = ["reqwest"] }
+# The HTTP client fastframe-update reads the releases with, on the rustls
+# and ring the SSH and database drivers already build.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 # The database layer (no UI dependencies).
 tabletist-db = { path = "crates/tabletist-db" }
 # The backend runtime: one OS thread running tokio, where every database

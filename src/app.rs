@@ -108,6 +108,9 @@ pub struct App {
     /// The window is closing: it was asked to, and no tab holds edits any
     /// more, or the user gave them up.
     pub closing: bool,
+    /// The look for a newer release, and the update on its way in. Off
+    /// until the window turns it on: never in tests or the demo.
+    pub updates: crate::updates::Updates,
     next_id: u64,
 }
 
@@ -150,6 +153,7 @@ impl App {
             window_title: "Tabletist".into(),
             closed_editors: Vec::new(),
             closing: false,
+            updates: crate::updates::Updates::disabled(),
             next_id: 1,
         };
         let tab = app.picker_tab();
@@ -1549,6 +1553,10 @@ impl App {
                     }
                 }
             }
+            Action::CheckForUpdates => self.updates.check_now(),
+            Action::DownloadUpdate => self.updates.download(),
+            // With pending changes it never gets here: see `dropped_by`.
+            Action::RestartToUpdate => self.updates.restart(),
             Action::CloseDialog => {
                 // Any dialog goes. The conflict question leaves its line
                 // for the rows it did not get an answer for.
@@ -3825,6 +3833,12 @@ impl App {
                 self.palette = palette;
                 theme::apply(ctx, &palette, &self.look);
             }
+        }
+        // The update's helper waits for the app to quit before it
+        // replaces it. Nothing holds edits: Restart asked first.
+        if self.updates.installing() {
+            self.closing = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
         // A hidden window draws no frame: its close request is answered
         // here, or nothing would hold it back.

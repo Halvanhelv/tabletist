@@ -16670,6 +16670,32 @@ mod tests {
     }
 
     #[test]
+    fn restarting_to_update_with_pending_changes_asks_first() {
+        use crate::updates::{Step, Updates};
+        let (mut harness, tab, id) = editable_in(Look::for_platform());
+        harness.app.updates = Updates::downloaded("9.9.9");
+        make_pending(&mut harness, tab, id, (1, 1), "bob@example.com");
+        harness.app.apply(Action::RestartToUpdate);
+        assert!(leaving(&harness));
+        assert_eq!(harness.app.updates.offer().unwrap().step, Step::Restart);
+        assert!(!harness.app.closing);
+        answer_leave(&mut harness, Leave::Stay);
+        assert_eq!(edits(&harness, tab, id).cells.len(), 1);
+        // From the About dialog the question has no room: a notice says it.
+        harness.app.apply(Action::ShowAbout);
+        harness.app.apply(Action::RestartToUpdate);
+        assert!(matches!(
+            harness.app.dialog,
+            Some(crate::model::Dialog::About)
+        ));
+        assert_eq!(
+            harness.app.notice.as_deref(),
+            Some("Save or discard the pending changes first.")
+        );
+        assert_eq!(harness.app.updates.offer().unwrap().step, Step::Restart);
+    }
+
+    #[test]
     fn closing_the_window_with_pending_changes_asks_first() {
         use egui::ViewportCommand::{CancelClose, Close};
         for look in Look::ALL {
